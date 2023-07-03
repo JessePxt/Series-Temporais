@@ -1,0 +1,381 @@
+---
+title: "Lista - AP2 - Identificação e Modelagem de Processos Estacionários"
+author: "Jessé Peixoto de Freitas"
+date: "`r format(Sys.Date(), '%d/%m/%Y')`"
+output: html_document
+---
+
+## Introdução
+
+  O presente trabalho tem como objetivo estudar o comportamento de alguns indicadores econômicos, como IPCA, e financeiros e avaliar suas séries temporais. Os modelo de séries temporais considerados serão AR - Autoregressivos, MA - Média móvel e ARMA -  Autoregressivos de Média móvel, assim como suas respectivas Funções de Autocorrelação - FAC (*em inglês ACF - autocorrelation function*) e Autocorrelação Parcial (*em inglês PACF - Partial autocorrelation function*). Serão usados alguns testes de validação como Ljung-Box que avalia a autocorrelação do resíduos como suas defasagens. O Objetivo é verificar se a série apresenta Estacionariedade e apartir disso determina modelo e suas estimativas. O software ultilizado será o R/RStudio e os pacotes utilizados seram apresentados ao longo do texto.
+
+## Questão 1:
+
+Calcule as FAC e FACP (5 primeiros valores) para os processos estacionários a seguir:
+
+a) $Y_t = \varepsilon _t + \theta \varepsilon_{t-1}; \theta = -0,5$
+
+b) $(1 - \phi L )Y_t = \varepsilon _t; \phi = -0,9$
+
+c) $(1 - \phi L )Y_t = \varepsilon _t + \theta \varepsilon_{t-1} ; \phi = -0,9 ; \theta = -0,5$
+
+
+
+## Questão 2:
+
+### Fontes do dados:  
+
+  Obtenha as Séries do IPCA (IBGE - Instituto Brasileiro de Geografia e Estatística), Saldo de Crédito Total (BCB - Banco Central do Brasil), Retornos do Ibovespa e o preço de um ativo presente na B3 à sua escolha. (Todas mensais, de 01/2015 a 12/2022). Então, para cada série:
+Fontes utilizadas:
+
+  - Fonte IBGE: [ibge.gov.br/](https://www.ibge.gov.br/estatisticas/economicas/precos-e-custos/9256-indice-nacional-de-precos-ao-consumidor-amplo.html?=&t=series-historicas)
+ 
+  - Fonte BCB: [bcb.gov.br/](https://www3.bcb.gov.br/sgspub/consultarvalores/consultarValoresSeries.do?method=consultarValores)
+ 
+  - Fonte IBOVESPA: [br.financas.yahoo.com/quote/%5EBVSP](https://br.financas.yahoo.com/quote/%5EBVSP/history?period1=1420070400&period2=1672444800&interval=1mo&filter=history&frequency=1mo&includeAdjustedClose=true)
+
+  - Fonte AAPL: [br.financas.yahoo.com/quote/AAPL](https://br.financas.yahoo.com/quote/AAPL/history?period1=1420070400&period2=1672444800&interval=1mo&filter=history&frequency=1mo&includeAdjustedClose=true)
+ 
+### Carregando pacotes:
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+#install.packages(c("kableExtra","ggfortify","forecast","ggplot2","lmtest","readr","knitr"))
+```
+
+```{r message=FALSE, warning=FALSE}
+require(kableExtra)
+require(ggfortify)
+require(forecast)
+require(ggplot2)
+require(lmtest)
+require(readr)
+require(knitr)
+```
+
+### Definindo as Séries temporais:
+
+<!-- Definindo a Série temporal para Saldo da Carteira de Credito em R\$ (Milhões), Ibovespa em R\$ (Milhões), IPCA e ativo AAPL presente na B3. -->
+
+<!-- Carregando os arquivos: -->
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=TRUE}
+AAPL <- data.frame(read_csv("AAPL.csv", col_types = cols(Date = col_date(format = "%Y-%m-%d")), locale = locale(decimal_mark = ",", grouping_mark = ".")))
+IPCA <- data.frame(read_csv("IPCA.csv", col_types = cols(Data = col_date(format = "%m/%Y")), locale = locale(decimal_mark = ",", grouping_mark = ".")))
+Ibovespa <- data.frame(read_csv("Ibovespa.csv", col_types = cols(Date = col_date(format = "%Y-%m-%d")), locale = locale(decimal_mark = ",", grouping_mark = ".")))
+Saldo <- data.frame(read_csv("Saldo.csv", col_types = cols(Data = col_date(format = "%m/%Y")),
+    locale = locale(decimal_mark = ",", grouping_mark = ".")))
+```
+
+<!-- Definindo a Série temporal -->
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+Cred_ts <- ts(Saldo[,2], frequency = 12, start = c(2015,1))/1000
+IPCA_ts <- ts(IPCA[,2], frequency = 12, start = c(2015,1))
+dIBOV_ts <- ts(Ibovespa[,6], frequency = 12, start = c(2015,1))
+IBOV_ts <- diff(dIBOV_ts)/stats::lag(dIBOV_ts, k=-1)
+dAtiv_ts <- ts(AAPL[,6], frequency = 12, start = c(2015,1))
+Ativ_ts <- diff(dAtiv_ts)/stats::lag(dAtiv_ts, k=-1)
+```
+
+### Carregando pacotes:
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+#install.packages(c("kableExtra","ggfortify","forecast","ggplot2","lmtest","readr","knitr"))
+```
+
+```{r message=FALSE, warning=FALSE}
+require(kableExtra)
+require(ggfortify)
+require(forecast)
+require(ggplot2)
+require(lmtest)
+require(readr)
+require(knitr)
+```
+
+
+
+### IBOVESPA
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+Dados = IBOV_ts
+
+autoplot(Dados, legend = T) +
+  theme_bw() +
+  theme(legend.position = 'bottom') +
+  labs(title = "Serie temporal", subtitle = 'Retorno IBOVESPA, mensal', x = "" , y = "")
+```
+
+  Apartir da visualização da série podemos verificar indícios que o retornos são Estacionários. Para isso devemos realizar alguns testes, como analise das autocorrelações.
+ 
+Visualizando FAC e FACP:
+---
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+Ljung <- function(data,l){
+          Lj <- data.frame(matrix(NA,2,l))
+          colnames(Lj) <- c(1:l)
+          rownames(Lj) <- c("Q","p-valor")
+          for(i in 1:l){
+              Q = Box.test(data, lag = i, type = "Ljung")
+              Lj[,i] <- c(Q$statistic,Q$p.value)
+          }
+          Lj <- t(Lj)
+          return(Lj)
+}
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+library(patchwork)
+FAC.Dados <- ggAcf(Dados)
+FACP.Dados <- ggPacf(Dados)
+LJung.Dados <- Ljung(Dados, dim(FAC.Dados$data)[1])
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+plot1 <- FAC.Dados +
+  theme_bw() +
+  labs(title = "FAC", subtitle = 'Retorno IBOVESPA, mensal', fill = "", x = "Defasagem, Lag", y = "" )
+```
+
+ 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+plot2 <- FACP.Dados +
+  theme_bw() +
+  labs(title = "FACP", subtitle = 'Retorno IBOVESPA, mensal', fill = "", x = "Defasagem, Lag", y = "")
+plot1 + plot2
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+LAG.Dados <- c(1:10)
+Auto.Dados <- round(data.frame(FAC.Dados$data$Freq[1:10],FACP.Dados$data$Freq[1:10], LJung.Dados[1:10,]),4)
+colnames(Auto.Dados)<-c("FAC","FACP","Ljung–Box","p-valor")
+rownames(Auto.Dados)<-c(1:10)
+kable(t(Auto.Dados),
+    caption = "FAC vs FACP, por defasagem"
+) %>%
+kable_styling(full_width = T)
+```
+
+Diagnostico de residuos:
+---
+```{r}
+modelo <- arima(Dados, order = c(0,0,0))
+residuos <- modelo$residuals
+FAC.Dados <- ggAcf(Dados)
+FACP.Dados <- ggPacf(Dados)
+LJung.Dados <- Ljung(Dados, dim(FAC.Dados$data)[1])
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+LAG.Dados <- c(1:10)
+Auto.Dados <- round(data.frame(FAC.Dados$data$Freq[1:10],FACP.Dados$data$Freq[1:10], LJung.Dados[1:10,]),4)
+colnames(Auto.Dados)<-c("FAC","FACP","Ljung–Box","p-valor")
+rownames(Auto.Dados)<-c(1:10)
+kable(t(Auto.Dados),
+    caption = "FAC vs FACP dos Resíduos, por defasagem"
+) %>%
+kable_styling(full_width = T)
+```
+
+Testes TS
+
+1. Teste de Normalidade do resíduos:
+   1.1  Kernel(ê)
+Se: e ~ Ruído Branco
+  (ê: Padronizado)
+
+```{r}
+modelo <- arima(Dados, order <- c(0,0,0))
+residuos <- modelo$residuals
+Diag1 <- ggtsdiag(modelo) + theme_minimal()
+
+Diag1@plots[[3]]
+  
+Diag2 <- ggPacf(residuos) + labs(title = "PACF of Residuals") + theme_minimal()
+Diag1 + Diag2
+```
+
+
+2. Teste de Normalidade dos momentos:
+   2.1 Jarque-Bera
+Se: Assimetria = 0
+Se: Excesso de Cortose = 0
+
+```{r}
+#install.packages("quantmod")
+#install.packages("fBasics")
+require(quantmod)
+require(fBasics)
+```
+
+
+```{r}
+basicStats(Dados)
+normalTest(Dados,method='jb')
+```
+
+
+3. Teste da Autocorrelação dos Resíduos:
+   3.1 LM (Breusch-Godgrey)
+Se: Resíduos são idependentes
+
+
+
+
+4. Teste de heterocedasticidade Condicional:
+   4.1 ARCH-LM
+Se: Resíduos são idênticamente dist.
+
+```{r}
+#install.packages("nortsTest")
+require("nortsTest")
+arch.test(residuos)
+```
+
+5. Teste de Linearidade da Série:
+   5.1 RESET
+Se: Regresão é Linear
+
+
+
+ 
+  a. Realize os testes de identificação, assim como os de Critério de Informação e Diagnóstico de Resíduos.
+ 
+  b. Plote os gráficos de FAC e FACP.
+ 
+  c. Estime os coeficientes e apresente os modelos. (Utilize software apropriado)
+
+### IPCA
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+ggtsdisplay(IPCA_ts, plot.type=c("partial", "histogram", "scatter", "spectrum"), theme=theme_minimal(),main = "Série temporal, IPCA")
+```
+
+  a. Realize os testes de identificação, assim como os de Critério de Informação e Diagnóstico de Resíduos.
+
+  b. Plote os gráficos de FAC e FACP.
+
+  c. Estime os coeficientes e apresente os modelos. (Utilize software apropriado)
+
+### Credito
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+ggtsdisplay(Cred_ts, plot.type=c("partial", "histogram", "scatter", "spectrum"), theme=theme_minimal(),main = "Série temporal, Saldo da carteira de Crédito - R$ (em bilhões)")
+ 
+```
+
+  a. Realize os testes de identificação, assim como os de Critério de Informação e Diagnóstico de Resíduos.
+
+  b. Plote os gráficos de FAC e FACP.
+
+  c. Estime os coeficientes e apresente os modelos. (Utilize software apropriado)
+
+### AÇÃO
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+ggtsdisplay(dAtiv_ts, plot.type=c("partial", "histogram", "scatter", "spectrum"), theme=theme_minimal(), main = "Ação AAPL na B3, R$ (em milhões)")
+```
+
+  a. Realize os testes de identificação, assim como os de Critério de Informação e Diagnóstico de Resíduos.
+
+  b. Plote os gráficos de FAC e FACP.
+
+  c. Estime os coeficientes e apresente os modelos. (Utilize software apropriado)
+
+### Retorno da AÇÃO
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+ggtsdisplay(Ativ_ts, plot.type=c("partial", "histogram", "scatter", "spectrum"), theme=theme_minimal(), main = "Retorno da ação AAPL na B3, R$ (em milhões)")
+```
+
+  a. Realize os testes de identificação, assim como os de Critério de Informação e Diagnóstico de Resíduos.
+
+  b. Plote os gráficos de FAC e FACP.
+
+  c. Estime os coeficientes e apresente os modelos. (Utilize software apropriado)
+
+  d. O preço do ativo pode ser modelado por um processo estacionário? Se não, justifique e verifique se o retorno desse ativo é um processo estacionário.
+
+
+### Questão 3:
+
+Utilizando as séries disponibilizadas no arquivo "AP2.xlsx", faça para cada uma das séries o que se pede:
+
+### Definindo as séries temporais
+
+<!-- Carregando os arquivos: -->
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=TRUE}
+library(readxl)
+
+TS1 <- read_excel("ap2 (2).xlsx", sheet = "Q3.1",
+    col_names = FALSE)
+TS2 <- read_excel("ap2 (2).xlsx", sheet = "Q3.2",
+    col_names = FALSE)
+TS3 <- read_excel("ap2 (2).xlsx", sheet = "Q3.3",
+    col_names = FALSE)
+TS4 <- read_excel("ap2 (2).xlsx", sheet = "Q3.4",
+    col_names = FALSE)
+TS5 <- read_excel("ap2 (2).xlsx", sheet = "Q3.5",
+    col_names = FALSE)
+
+```
+
+<!-- Definindo a Série temporal -->
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+
+ts_1 <- ts(TS1, frequency = 1)
+ts_2 <- ts(TS2, frequency = 1)
+ts_3 <- ts(TS3, frequency = 1)
+ts_4 <- ts(TS4, frequency = 1)
+ts_5 <- ts(TS5, frequency = 1)
+
+```
+
+Visualizando as Séries:
+
+### Série Q3.1
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+forecast::ggtsdisplay(ts_1, plot.type=c("partial", "histogram", "scatter", "spectrum"), theme=theme_minimal(), main = "Série temporal, Q3.1")
+```
+
+### Série Q3.2
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+forecast::ggtsdisplay(ts_2, plot.type=c("partial", "histogram", "scatter", "spectrum"), theme=theme_minimal(), main = "Série temporal, Q3.2")
+```
+
+### Série Q3.3
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+forecast::ggtsdisplay(ts_3, plot.type=c("partial", "histogram", "scatter", "spectrum"), theme=theme_minimal(), main = "Série temporal, Q3.3")
+```
+
+### Série Q3.4
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+forecast::ggtsdisplay(ts_4, plot.type=c("partial", "histogram", "scatter", "spectrum"), theme=theme_minimal(), main = "Série temporal, Q3.4")
+```
+
+### Série Q3.5
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+forecast::ggtsdisplay(ts_5, plot.type=c("partial", "histogram", "scatter", "spectrum"), theme=theme_minimal(), main = "Série temporal, Q3.5")
+```
+
+a. Realize os testes de identificação, assim como os de Critério de Informação e
+Diagnóstico de Resíduos.
+
+arima; AIC; tsdiag(arima)
+
+b. Plote os gráficos de FAC e FACP.
+ggtsdisplay;
+
+c. Estime os coeficientes e apresente os modelos. (Utilize software apropriado)
+arima$coef; coeftest;
