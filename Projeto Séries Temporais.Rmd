@@ -139,14 +139,24 @@ plot1 <- FAC.Dados +
   labs(title = "FAC", subtitle = 'Retorno IBOVESPA, mensal', fill = "", x = "Defasagem, Lag", y = "" )
 ```
 
- 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
 plot2 <- FACP.Dados +
   theme_bw() +
   labs(title = "FACP", subtitle = 'Retorno IBOVESPA, mensal', fill = "", x = "Defasagem, Lag", y = "")
-plot1 + plot2
+modelo <- arima(Dados, order <- c(0,0,0))
+residuos <- modelo$residuals
+Diag1 <- ggtsdiag(modelo) + theme_minimal()
+
+diag = Diag1@plots[[3]] + labs(title = "Estatística Ljung-Box, p-valor por defasagem", y = "p-valor", x = "Defasagem, lag")
+  
+Diag2 <- ggPacf(residuos) + labs(title = "PACF of Residuals") + theme_minimal()
+
+
+plot1 + plot2 + diag
 ```
+
+
 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
@@ -162,7 +172,7 @@ kable_styling(full_width = T)
 
 Diagnostico de residuos:
 ---
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
 modelo <- arima(Dados, order = c(0,0,0))
 residuos <- modelo$residuals
 FAC.Dados <- ggAcf(Dados)
@@ -184,28 +194,21 @@ kable_styling(full_width = T)
 Testes TS
 
 1. Teste de Normalidade do resíduos:
+
    1.1  Kernel(ê)
+
 Se: e ~ Ruído Branco
   (ê: Padronizado)
 
-```{r}
-modelo <- arima(Dados, order <- c(0,0,0))
-residuos <- modelo$residuals
-Diag1 <- ggtsdiag(modelo) + theme_minimal()
-
-Diag1@plots[[3]]
-  
-Diag2 <- ggPacf(residuos) + labs(title = "PACF of Residuals") + theme_minimal()
-Diag1 + Diag2
-```
-
 
 2. Teste de Normalidade dos momentos:
+
    2.1 Jarque-Bera
+
 Se: Assimetria = 0
 Se: Excesso de Cortose = 0
 
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
 #install.packages("quantmod")
 #install.packages("fBasics")
 require(quantmod)
@@ -213,7 +216,7 @@ require(fBasics)
 ```
 
 
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
 basicStats(Dados)
 normalTest(Dados,method='jb')
 ```
@@ -230,7 +233,7 @@ Se: Resíduos são idependentes
    4.1 ARCH-LM
 Se: Resíduos são idênticamente dist.
 
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
 #install.packages("nortsTest")
 require("nortsTest")
 arch.test(residuos)
@@ -244,9 +247,13 @@ Se: Regresão é Linear
 
  
   a. Realize os testes de identificação, assim como os de Critério de Informação e Diagnóstico de Resíduos.
+
+#### Visualização, tabelas, AIC e Diagnostico Resíduos
  
   b. Plote os gráficos de FAC e FACP.
- 
+
+#### FAC e FACP
+
   c. Estime os coeficientes e apresente os modelos. (Utilize software apropriado)
 
 ### IPCA
